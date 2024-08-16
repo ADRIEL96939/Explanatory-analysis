@@ -1,0 +1,402 @@
+---
+title: "MVA Assingment"
+Author: "Adriel Oswald"
+output: word_document
+date: "2024-06-18"
+---
+
+```{r setup, warning = FALSE, message = FALSE, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+packages <- c("ICSNP","mvnormtest","biotools","HSAUR2","ggplot2",
+              "dplyr","psych","Hmisc","factoextra") 
+new.packages <- packages[!(packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+
+lapply(packages, require, character.only = TRUE)
+
+```
+
+```{r}
+#1st data
+# dt1 = read.csv(file="~/Desktop/Assignment/Malaysia.csv" ,header = TRUE)
+dt1 = read.csv(file="~/Desktop/Assignment/Malaysia.csv" ,header = TRUE)
+
+
+for (i in colnames(dt1)){
+  print(paste("Total Number of Missing Value of variable",i,"is",as.character(sum(is.na(dt1[,i])))))
+}
+dt1 = na.omit(dt1)
+
+# missing values for Q46-Q50, Employment, Class, Urban_Rural
+
+dt1$country = "MYS"
+str(dt1); dim(dt1)
+
+#2nd data
+#dt2 = read.csv(file="~/Desktop/Assignment/Australia.csv" ,header = TRUE)
+
+dt2 = read.csv(file="~/Desktop/Assignment/Australia.csv" ,header = TRUE)
+
+
+for (i in colnames(dt2)){
+  print(paste("Total Number of Missing Value of variable",i,"is",as.character(sum(is.na(dt2[,i])))))
+}
+dt2 = na.omit(dt2)
+
+# missing values for Q46-Q50, Employment, Class, Urban_Rural
+
+dt2$country = "AUS"
+
+set.seed(1)
+index = sample(1:nrow(dt1),500)
+
+MY_data = dt1[index,]
+AUS_data = dt2[index,]
+
+```
+
+```{r}
+# Get the set of all columns in both dataframes
+all_columns = union(names(MY_data), names(AUS_data))
+
+# Add missing columns to dt1
+MY_data[setdiff(all_columns, names(dt1))] = NA
+
+# Add missing columns to dt2
+AUS_data[setdiff(all_columns, names(dt2))] = NA
+
+# Combine the dataframes
+maindt = rbind(MY_data, AUS_data)
+print(dim(maindt))
+
+maindt$Q46a = max(maindt$Q46) + 1 - maindt$Q46
+maindt$Q47a = max(maindt$Q47) + 1 - maindt$Q47
+
+maindt = maindt[, -which(names(maindt) == "Q46")]
+maindt = maindt[, -which(names(maindt) == "Q47")]
+
+######
+
+AUS_data$Q46a = max(AUS_data$Q46) + 1 - AUS_data$Q46
+AUS_data$Q47a = max(AUS_data$Q47) + 1 - AUS_data$Q47
+
+AUS_data = AUS_data[, -which(names(AUS_data) == "Q46")]
+AUS_data = AUS_data[, -which(names(AUS_data) == "Q47")]
+
+######
+
+MY_data$Q46a = max(MY_data$Q46) + 1 - MY_data$Q46
+MY_data$Q47a = max(MY_data$Q47) + 1 - MY_data$Q47
+
+MY_data = MY_data[, -which(names(MY_data) == "Q46")]
+MY_data = MY_data[, -which(names(MY_data) == "Q47")]
+
+#######
+
+maindt$Class = as.factor(maindt$Class)
+maindt$Urban_Rural = as.factor(maindt$Urban_Rural)
+maindt$Employment = as.factor(maindt$Employment)
+
+AUS_data$Class = as.factor(AUS_data$Class)
+AUS_data$Urban_Rural = as.factor(AUS_data$Urban_Rural)
+AUS_data$Employment = as.factor(AUS_data$Employment)
+
+MY_data$Class = as.factor(MY_data$Class)
+MY_data$Urban_Rural = as.factor(MY_data$Urban_Rural)
+MY_data$Employment = as.factor(MY_data$Employment)
+```
+
+Data Vizualization
+
+```{r}
+
+# hist.data.frame(maindt[,c(7:11)]) # According to normal scale
+
+```
+
+```{r}
+#Let's select some variables 
+newdf = dplyr::select(maindt,c(Q46a:Q47a,Q48:Q50))
+str(newdf)
+pairs(newdf)
+cor(newdf)
+cor.plot(newdf)
+
+#Q48, Q49, and Q50 are strongly correlated. 
+```
+
+PCA
+
+```{r}
+myDV = maindt[,c(7:9,41:42)] # Q46a, Q47a, Q48, Q49, Q50
+#Perform PCA
+pr.out <- prcomp(myDV, scale = T)
+names(pr.out)
+#Interpret the loadings
+pr.out$rotation
+
+"The first loading component puts relatively large positive weights on Q48,Q49,Q50 and medium positive weights on Q46 and Q47. This component corresponds to the individual's internal perception on personal well-being (mental health)"
+
+"The second loading component puts relatively large negative weights on Q46a, Q47a. 
+and medium positive weights on Q48,Q49,Q50. This component corresponds to the individual's feel of life control and satisfaction that focuses on external circumstances and external satisfaction "
+
+#Produce biplot
+biplot (pr.out ,cex = 0.5, scale =0, main="Biplot")
+
+"Q47 vector seems orthogonal with Q48 and Q50,
+Self-rated help has no correlation with freedom of choice and control in your life + satisfaction with the financial situation of your household"
+
+"Q46,Q47 vectors are close to each other (small angle), happiness and health are related closely
+Q48,Q49 and Q50 vectors are close to each other (small angle) freedom of choice, life satisfaction and financial satisfaction are related closely, but the two groups are quite far apart from each other"
+
+"The length of the five principal components loading vector are similar, they represent similar amount of variability of the variables to explain represented by the two PCs."
+
+"A lot of observations are located at the origin of PC1 and origin of PC2
+majority of individuals have average level of internal well-being, control of choices and satisfaction with life" 
+
+#Proportion of Variance explained (PVE)
+summary(pr.out)
+# 2 PCs captured 74.32 % of variance explained
+
+#Variance explained by each principal component 
+pr.var = pr.out$sdev^2 
+pve = pr.var/sum(pr.var )
+pve
+#Plot the PVE of by each component
+plot(pve , xlab=" Principal Component ", main = "Scree plot",
+     ylab=" Proportion of Variance Explained ", ylim=c(0,1) ,type="b");text(x=1:10,y=pve,labels=scales::percent(pve),pos=3,cex=0.8)
+#Scree plot
+fviz_eig(pr.out, addlabels = TRUE)
+#Knee at PC2
+
+country = as.factor(maindt$country)
+
+tmp = as.data.frame(pr.out$x)
+tmp_PCAcountry = cbind(tmp,country)
+str(tmp_PCAcountry)
+
+#Visualization with ggplots
+ggplot(tmp_PCAcountry, aes(x=PC1, y = PC2, color=country)) +
+  geom_point(size=2 ) +
+  labs(title="PCA Plot ", subtitle = " ") + 
+  theme(plot.title = element_text(color ="black", size=15, face = "bold")) +
+  geom_hline(yintercept=0, linetype="dashed", color = "black", linewidth=0.5) +
+  geom_vline(xintercept=0, linetype="dashed", color = "black", linewidth=0.5) 
+
+"The observations for Australia and Malaysia are similar.
+Most of the observations lie on the positive side of PC1 and negative of side of PC2,
+indicating that most individuals from both country are more content with their mental state
+and are able to control their life and external circumstances"
+
+myDVAus = AUS_data[,c(7:9,41:42)]
+pr.out.Aus <- prcomp(myDVAus, scale = T)
+pr.out.Aus$rotation
+
+Aus_class = as.factor(AUS_data$Class)
+tmpAus = as.data.frame(pr.out.Aus$x)
+tmp_PCAclassAus = cbind(tmpAus,Aus_class)
+str(tmp_PCAclassAus)
+
+ggplot(tmp_PCAclassAus, aes(x=PC1, y = PC2, color=Aus_class)) +
+geom_point(size=2 ) +
+labs(title="PCA Plot ", subtitle = " ") +
+theme(plot.title = element_text(color ="black", size=15, face = "bold")) + geom_hline(yintercept=0, linetype="dashed", color = "black", size=0.5) + geom_vline(xintercept=0, linetype="dashed", color = "black", size=0.5)
+
+"(1=Upper class; 2=Upper middle class; 3=Lower middle class; 4=Working
+class; 5=Lower class)"
+
+"For the upper class points lie on the positive side of PC1 and negative side of PC2, they are internally happy and overall satisfied with life. For upper middle class, most of the points same like upper class. For the lower middle class lie on average side of PC1 and PC2. For the working class, lie on the negative side of PC1 and are scattered on the positive and negative side of PC2. They are depressed and have mixed feelings whether their life is in control. For the lower class, most of them are in positive PC2 and negative PC1. They are depressed and not content with not having control of their lives"
+
+myDVMy = MY_data[,c(7:9,41:42)]
+pr.out.My <- prcomp(myDVMy, scale = T)
+pr.out.My$rotation
+
+My_class = as.factor(MY_data$Class)
+tmpMy = as.data.frame(pr.out.My$x)
+tmp_PCAclassMy = cbind(tmpMy,My_class)
+str(tmp_PCAclassMy)
+
+ggplot(tmp_PCAclassMy, aes(x=PC1, y = PC2, color=My_class)) +
+geom_point(size=2 ) +
+labs(title="PCA Plot ", subtitle = " ") +
+theme(plot.title = element_text(color ="black", size=15, face = "bold")) + geom_hline(yintercept=0, linetype="dashed", color = "black", size=0.5) + geom_vline(xintercept=0, linetype="dashed", color = "black", size=0.5)
+
+"Interpretation & Comparison"
+
+Aus_Employment = as.factor(AUS_data$Employment)
+
+tmp_PCAEmpAus = cbind(tmp,Aus_Employment)
+str(tmp_PCAEmpAus)
+ggplot(tmp_PCAEmpAus, aes(x=PC1, y = PC2, color=Aus_Employment)) +
+geom_point(size=2 ) +
+labs(title="PCA Plot ", subtitle = " ") +
+theme(plot.title = element_text(color ="black", size=15, face = "bold")) + geom_hline(yintercept=0, linetype="dashed", color = "black", size=0.5) + geom_vline(xintercept=0, linetype="dashed", color = "black", size=0.5)
+
+"Interpretation"
+
+My_Employment = as.factor(MY_data$Employment)
+
+tmp_PCAEmpMy = cbind(tmp,My_Employment)
+str(tmp_PCAEmpMy)
+ggplot(tmp_PCAEmpMy, aes(x=PC1, y = PC2, color=My_Employment)) +
+geom_point(size=2 ) +
+labs(title="PCA Plot ", subtitle = " ") +
+theme(plot.title = element_text(color ="black", size=15, face = "bold")) + geom_hline(yintercept=0, linetype="dashed", color = "black", size=0.5) + geom_vline(xintercept=0, linetype="dashed", color = "black", size=0.5)
+
+"Interpretation & Comparison"
+
+```
+
+K-means clustering
+
+```{r}
+set.seed(1)
+fviz_nbclust(pr.out.Aus$x[,c(1:2)], kmeans, method = "wss") +
+ggtitle("Scree Plot for Determining Optimal Number of Clusters")
+"the point where the curve starts following a smoothly declining pattern @ 5. "
+
+# For Australia
+kmsAus = kmeans(pr.out.Aus$x[,c(1,2)], centers=5, nstart=20)
+kmsAus
+
+#Plot the data with the cluster assignments
+##Plot 1
+plot(pr.out.Aus$x[, 1:2], col=(kmsAus$cluster), pch=20, cex=2)
+##Plot 2
+plot(pr.out.Aus$x[, 1:2], type="n"); text(pr.out.Aus$x[, 1:2], rownames(dt), col=(kmsAus$cluster+8), cex = 0.6)
+
+# For Malaysia
+
+fviz_nbclust(pr.out.My$x[,c(1:2)], kmeans, method = "wss") +
+ggtitle("Scree Plot for Determining Optimal Number of Clusters")
+"the point where the curve starts following a smoothly declining pattern @ 5. "
+
+kmsMy = kmeans(pr.out.My$x[,c(1,2)], centers=5, nstart=20)
+kmsMy
+
+#Plot the data with the cluster assignments
+##Plot 1
+plot(pr.out.My$x[, 1:2], col=(kmsMy$cluster), pch=20, cex=2)
+##Plot 2
+plot(pr.out.My$x[, 1:2], type="n"); text(pr.out.My$x[, 1:2], rownames(dt), col=(kmsMy$cluster+8), cex = 0.6)
+
+
+```
+
+# Australia
+The between_SS/total_SS (79.8 %) value is the % of variance explained by the cluster means. Somewhat similar to the R-squared for clustering.
+
+There appears to be a clear partition when K=5.
+
+Similar characteristics- Green cluster - more powerful cars, but not fast cars Blue cluster - more powerful, fast cars Red cluster - more fuel efficient
+
+# Malaysia
+The between_SS/total_SS (76.2 %) value is the % of variance explained by the cluster means. Somewhat similar to the R-squared for clustering.
+
+There appears to be a clear partition when K=5.
+
+Similar characteristics- Green cluster - more powerful cars, but not fast cars Blue cluster - more powerful, fast cars Red cluster - more fuel efficient
+
+For PC1 vs PC3, it appears to be a clearer partition when k = 5 compared to k = 4 which is demonstrated in Graph D.3. According to Graph D.4, the result for Black and Purple clusters are relatively similar as both clusters fall under the same quadrant. Hence, 5 clusters are the most suitable in this case.
+
+Observations in the Light Blue cluster have negative scores at PC1 and a mix of both positive and negative scores (neutral) at PC3. This reveals that the respondents who express uncertainty regarding the importance of friends and leisure in their lives are dissatisfied with their overall well-being and quality of life. Meanwhile, the Red cluster has a mix of both positive and negative scores (neutral) at PC1 and overall negative scores at PC3. This reveals that the respondents who perceive friends and leisure as unimportant in their lives are uncertain about their satisfaction with their overall well-being and quality of life. Likewise, the green cluster has the same score as the Red cluster but overall positive scores at PC3. This suggests that the respondents who perceive friends and leisure as important in their lives are unsure about their satisfaction with their overall well-being and quality of life.
+
+Observations in the Black cluster have negative scores at PC1 and PC3. This shows that the respondents who are satisfied with their overall well-being and quality of life also place great importance on friends and leisure in life. Furthermore, the observations in the Blue cluster have positive scores at PC1 and negative scores at PC3. This implies that the respondents who are satisfied with their overall well-being and quality of life believe that friends and leisure are not so important in their lives.
+
+EFA
+
+```{r}
+newAus = dplyr::select(AUS_data,c(Q46a:Q47a,Q48:Q50))
+str(newAus)
+corAus = cor(newAus)
+
+newMy = dplyr::select(MY_data,c(Q46a:Q47a,Q48:Q50))
+str(newMy)
+corMy = cor(newMy)
+
+#a. Measure of sampling adequacy (MSA)
+#b. Bartlett’s Test of Sphericity
+
+KMO(corAus)
+cortest.bartlett(corAus, n=500, diag = TRUE)
+factanal(covmat = corAus, factors = 2, n.obs = 500, rotation = "promax")
+
+KMO(corMy)
+cortest.bartlett(corMy, n=500, diag = TRUE)
+factanal(covmat = corMy, factors = 2, n.obs = 500, rotation = "promax")
+```
+(2a) KMO results:
+The KMO statistic indicates the proportion of variance in the variables that might be caused by underlying factors. The Overall MSA (Measure of sampling adequacy) exceeds 0.5 (0.81) 
+The MSA for each individual variable also exceeds 0.5. Hence, factor analysis may be useful.
+(2b) Bartlett’s test results:
+The p-value is very small(6.835043e-217) and statistically significant (sig. < .05). This
+indicates that sufficient correlations exist among the variables to proceed with factor
+analysis
+
+verbal reasoning assessments: reading, vocab, dominates the first factor.
+Spatial reasoning assessments: picture, blocks, maze, dominate the second factor.
+General test, unclear, however the loading is higher under factor 2.
+2 factors are sufficient (p-value=0.765).
+
+# Australia
+Factor1 : high on 47a,48,49,50
+Factor2 : high on 46a
+# Malaysia
+Factor1 : high on 48,49,50
+Factor2 : high on 46a
+47a is unclear, however the loading is slighly higher under factor 1.
+
+MANOVA
+
+Are there differences between Australia and Malaysia in terms of well-being/ quality of life ?
+
+```{r}
+my_DV <- maindt[,c(41:42,7:9)]
+str(my_DV)
+
+#Check Assumptions of Normality
+
+mshapiro.test(t(my_DV)) # p-value < 2.2e-16; violated
+# H0: the 5 variables are multivariate normal reject H0 if p-value < 5% p-value < 2.2e-16, reject H0 of multivariate normality
+
+#Check for positive determinant
+
+det(cov(my_DV)) # 2.035
+
+#Checking Assumptions of Equality of Variance-Covariance Matrices
+
+boxM(maindt[,c(41:42,7:9)],maindt[,40]) # H0: Homogeneity of Covariance Matrices / covariance matrices are relatively similar. reject H0 if p-value < 5% p-value < 2.2e-16, reject H0 of homogeneity of variance-covariance matrices
+
+#MANOVA (between countries)
+
+m_Country <- manova(cbind(Q46a, Q47a, Q48, Q49, Q50) ~ country, data = maindt)
+
+summary(m_Country, test = "Wilks")
+
+# p-value: 2.2e-16; reject H0
+# The two countries differ on the set of five variables. There are Country differences on the 5 variables (well-being of people in respective countries).
+
+summary.aov(m_Country)
+
+# Q46a, Q47a, Q48, Q49, Q50 (All 5 variables are significant)
+
+#MANOVA (between Age Group and all 5 variables) Malaysia
+
+MYS <- maindt %>%
+  filter(country == "MYS")
+
+# Check all assumptions as well
+
+m_Age_MYS <- manova(cbind(Q46a, Q47a, Q48, Q49, Q50) ~ Age_Group, data = MYS)
+
+summary(m_Age_MYS, test = "Wilks")
+
+# p-value: 2.713e-07; reject H0
+# The three Age Groups differ on the set of five variables for Malaysia. There are Age Group differences on the 5 variables (well-being of people in Malaysia).
+
+summary.aov(m_Age_MYS)
+
+# Q47a (at 0 %), Q50 (at 0.1 %) (2 variables are significant)
+
+```
